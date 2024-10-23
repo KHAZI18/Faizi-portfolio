@@ -15,35 +15,68 @@ export default function Home() {
 		}
   ]);
 
+  // const submitForm = async (e) => {
+  //   e.preventDefault();
+  
+  //   // Add the user's message to the messages array
+  //   let newMessages = [...messages, { role: 'user', content: messageInput }];
+  //   setMessages(newMessages);
+  
+  //   // Clear the input field
+  //   setMessageInput('');
+  
+  //   try {
+  //     // Make the POST request to the API endpoint
+  //     const apiMessage = await fetch('/api', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ messages: newMessages }), // Send all messages including user's input
+  //     }).then(res => res.json());
+  
+  //     // Add the assistant's reply to the messages array
+  //     setMessages([...newMessages, { role: 'assistant', content: apiMessage.message }]);
+  
+  //   } catch (error) {
+  //     console.error('Error fetching AI response:', error);
+  //     // Optionally, you can handle the error in the UI as well
+  //   }
+  // };
   const submitForm = async (e) => {
-    e.preventDefault();
-  
-    // Add the user's message to the messages array
-    let newMessages = [...messages, { role: 'user', content: messageInput }];
-    setMessages(newMessages);
-  
-    // Clear the input field
-    setMessageInput('');
-  
-    try {
-      // Make the POST request to the API endpoint
-      const apiMessage = await fetch('/api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messages: newMessages }), // Send all messages including user's input
-      }).then(res => res.json());
-  
+  e.preventDefault();
+
+  // Add the user's message to the messages array
+  let newMessages = [...messages, { role: 'user', content: messageInput }];
+  setMessages(newMessages);
+
+  // Clear the input field
+  setMessageInput('');
+
+  try {
+    // Make the POST request to the correct API route
+    const apiMessage = await fetch('/api/route', { // Updated to /api/route
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ messages: newMessages }), // Send all messages including user's input
+    });
+
+    const data = await apiMessage.json();
+    
+    if (apiMessage.ok) {
       // Add the assistant's reply to the messages array
-      setMessages([...newMessages, { role: 'assistant', content: apiMessage.message }]);
-  
-    } catch (error) {
-      console.error('Error fetching AI response:', error);
-      // Optionally, you can handle the error in the UI as well
+      setMessages([...newMessages, { role: 'assistant', content: data.message }]);
+    } else {
+      console.error("Error from API:", data.error);
     }
-  };
-  
+
+  } catch (error) {
+    console.error('Error fetching AI response:', error);
+  }
+};
+
   const toggleMobileMenu = () => {
     setMenuOpen(!menuOpen);
   }
