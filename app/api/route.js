@@ -1,3 +1,35 @@
+// import { OpenAIClient, AzureKeyCredential } from '@azure/openai';
+// import { NextResponse } from 'next/server';
+
+// const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+// const apiKey = process.env.AZURE_OPENAI_API_KEY;
+// const model = process.env.AZURE_OPENAI_MODEL;
+  
+
+// export async function POST(req){
+	
+// 	const { messages } = await req.json();
+
+// 	const client = new OpenAIClient(endpoint, new AzureKeyCredential(apiKey));
+
+// 	messages.unshift({
+// 		role: 'system',
+// 		content: `You are Faizi, answering only questions based on the resume provided.
+// Resume:
+// ${DATA_RESUME}
+
+// Help users learn more about Faizan from his resume.`
+// 	})
+
+// 	const response = await client.getChatCompletions(model, messages, {
+// 		maxTokens: 128,
+// 	})
+
+// 	return NextResponse.json({ 
+// 		message: response.choices[0].message.content
+// 	 })
+// }
+
 import { OpenAIClient, AzureKeyCredential } from '@azure/openai';
 import { NextResponse } from 'next/server';
 
@@ -5,43 +37,39 @@ const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
 const apiKey = process.env.AZURE_OPENAI_API_KEY;
 const model = process.env.AZURE_OPENAI_MODEL;
 
-// export async function POST(req) {
-// 	const { messages } = await req.json(); // Extract the messages from the request body
-  
-// 	const client = new OpenAIClient(endpoint, new AzureKeyCredential(apiKey));
-  
-// 	const response = await client.getChatCompletions(model, messages, {
-// 	  maxTokens: 128,
-// 	});
-  
-// 	return NextResponse.json({
-// 	  message: response.choices[0].message.content,
-// 	});
-//   }
-  
+export async function POST(req) {
+  try {
+    const { messages } = await req.json();
 
-export async function POST(req){
-	
-	const { messages } = await req.json();
+    // Check if required environment variables are available
+    if (!endpoint || !apiKey || !model) {
+      throw new Error("Missing OpenAI configuration. Check environment variables.");
+    }
 
-	const client = new OpenAIClient(endpoint, new AzureKeyCredential(apiKey));
+    // Initialize Azure OpenAI client
+    const client = new OpenAIClient(endpoint, new AzureKeyCredential(apiKey));
 
-	messages.unshift({
-		role: 'system',
-		content: `You are Faizi, answering only questions based on the resume provided.
-Resume:
-${DATA_RESUME}
+    // Add system prompt to the beginning of the conversation
+    messages.unshift({
+      role: 'system',
+      content: `You are Faizi, answering only questions based on the resume provided.
+      Resume:
+      ${DATA_RESUME}
+      Help users learn more about Faizan from his resume.`
+    });
 
-Help users learn more about Faizan from his resume.`
-	})
+    // Send a request to Azure OpenAI to get a completion
+    const response = await client.getChatCompletions(model, messages, {
+      maxTokens: 128,
+    });
 
-	const response = await client.getChatCompletions(model, messages, {
-		maxTokens: 128,
-	})
-
-	return NextResponse.json({ 
-		message: response.choices[0].message.content
-	 })
+    // Return the response from Azure OpenAI
+    return NextResponse.json({ message: response.choices[0].message.content });
+  } catch (error) {
+    // Log and return the error if anything goes wrong
+    console.error("Error in AI API route:", error.message);
+    return NextResponse.json({ error: "Failed to generate AI response" }, { status: 500 });
+  }
 }
 
 const DATA_RESUME = `Faizan Khazi
