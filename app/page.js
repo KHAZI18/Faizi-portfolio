@@ -54,8 +54,8 @@ export default function Home() {
   setMessageInput('');
 
   try {
-    // Make the POST request to the correct API route
-    const apiMessage = await fetch('/api/route', { // Updated to /api/route
+  // Make the POST request to the correct API route
+  const apiMessage = await fetch('/api', { // call the API route at /api
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
