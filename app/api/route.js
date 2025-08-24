@@ -30,95 +30,158 @@
 // 	 })
 // }
 
-import { OpenAIClient, AzureKeyCredential } from '@azure/openai';
 import { NextResponse } from 'next/server';
 
-const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-const apiKey = process.env.AZURE_OPENAI_API_KEY;
-const model = process.env.AZURE_OPENAI_MODEL;
+const apiKey = process.env.GROQ_API_KEY;
+const model = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 
 export async function POST(req) {
   try {
     const { messages } = await req.json();
 
-    // Check if required environment variables are available
-    if (!endpoint || !apiKey || !model) {
-      throw new Error("Missing OpenAI configuration. Check environment variables.");
+    // Ensure API key is provided
+    if (!apiKey) {
+      throw new Error("Missing GROQ_API_KEY. Set GROQ_API_KEY in your environment.");
     }
 
-    // Initialize Azure OpenAI client
-    const client = new OpenAIClient(endpoint, new AzureKeyCredential(apiKey));
+    // Dynamically import groq SDK to avoid compile-time failure if not installed
+    let Groq;
+    try {
+      Groq = (await import('groq-sdk')).default;
+    } catch (err) {
+      // If the SDK isn't installed, try a REST fallback using GROQ_REST_URL
+      console.warn('groq-sdk not installed, attempting REST fallback:', err.message || err);
 
-    // Add system prompt to the beginning of the conversation
+      const restUrl = process.env.GROQ_REST_URL; // full URL to POST to (e.g. https://api.groq.example/v1/chat/completions)
+      if (!restUrl) {
+        console.error('No GROQ_REST_URL set for REST fallback');
+        return NextResponse.json({ error: 'groq-sdk not installed and GROQ_REST_URL not set. Install the SDK or set GROQ_REST_URL to your Groq API endpoint.' }, { status: 500 });
+      }
+
+      // Prepend system prompt
+      messages.unshift({
+        role: 'system',
+        content: `You are Faizi, answering only questions based on the resume provided.\nResume:\n${DATA_RESUME}\nHelp users learn more about Faizan from his resume.`
+      });
+
+      // Call the REST endpoint directly
+      const res = await fetch(restUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify({ messages, model }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('Groq REST fallback failed:', res.status, text);
+        throw new Error('Groq REST fallback request failed');
+      }
+
+      const json = await res.json().catch(() => null);
+      const content = json?.choices?.[0]?.message?.content ?? json?.message ?? null;
+      if (!content) throw new Error('No completion returned from Groq REST endpoint');
+
+      return NextResponse.json({ message: content });
+    }
+
+    // If SDK imported, use it
+    const groq = new Groq({ apiKey });
+
+    // Prepend a system prompt with the resume context
     messages.unshift({
       role: 'system',
-      content: `You are Faizi, answering only questions based on the resume provided.
-      Resume:
-      ${DATA_RESUME}
-      Help users learn more about Faizan from his resume.`
+      content: `You are Faizi, answering only questions based on the resume provided.\nResume:\n${DATA_RESUME}\nHelp users learn more about Faizan from his resume.`
     });
 
-    // Send a request to Azure OpenAI to get a completion
-    const response = await client.getChatCompletions(model, messages, {
-      maxTokens: 128,
+    // Call Groq chat completions
+    const response = await groq.chat.completions.create({
+      messages,
+      model,
+      // Optionally tune other params here (max_tokens, temperature, etc.)
     });
 
-    // Return the response from Azure OpenAI
-    return NextResponse.json({ message: response.choices[0].message.content });
+    const content = response?.choices?.[0]?.message?.content ?? null;
+    if (!content) {
+      throw new Error('No completion returned from LLM');
+    }
+
+    return NextResponse.json({ message: content });
   } catch (error) {
-    // Log and return the error if anything goes wrong
-    console.error("Error in AI API route:", error.message);
+    console.error("Error in AI API route:", error?.message ?? error);
     return NextResponse.json({ error: "Failed to generate AI response" }, { status: 500 });
   }
 }
 
-const DATA_RESUME = `Faizan Khazi
-Address: MSRIT POST GRADUATE Boys Hostel, Mathikere, Bengaluru, 560054, India
-Phone: +918431054174
+const DATA_RESUME = `Mohammed Faizan K
+Phone: +91-8431054174
 Email: faizankhazi8@gmail.com
+Portfolio: https://khazi18.vercel.app/
+LinkedIn: https://linkedin.com/in/yourprofile
+GitHub: https://github.com/khazi18
+
 Education
-Current Education:
-Pursuing Bachelor of Engineering in Information Science and Engineering at M S Ramaiah Institute of Technology, Bengaluru (started in October 2023).
-Current CGPA: 8.0.
-Previous Education:
-Completed a Diploma in Computer Science and Engineering from Bapuji Polytechnic Shabanur, Davangere (May 2021 - July 2023).
-CGPA: 9.8.
-Ranked 99th in Karnataka CET.
-Name of the High School is Bapuji High school [2017-2020]
+M S Ramaiah Institute of Technology (2022 – 2026)
+Bachelor of Engineering in Information Science and Engineering
+Current CGPA: 8.02
+Relevant Coursework: DSA, OOPS, Operating Systems, DBMS, Discrete Mathematical Structures, Microcontrollers, Advanced Java
 
-Skills and Competences
-Mern Stack Website Developer 
-Front End:  HTML, CSS, JavaScript, Bootstrap, Tailwind, Figma, Canva,  SEO React,jQuery , REST, AJAX/API, Responsive Design
-Back End:  NodeJS, MySQL, MongoDB, MySQL, noSQL, Express, Java
-Platforms: Amazon AWS, Linux, Windows, Cloud, Automation, Custom 
-Frameworks: WordPress, Github 
+Bapuji Polytechnic Shabanuru (2020 – 2023)
+Diploma in Computer Science and Engineering
+CGPA: 9.6
+Ranked 99th in Karnataka CET
 
-Projects:
-Optical Character Recognition (OCR) Software (June 2023): Converts images to text and provides options to read the output in different voices.
-TextUtilx - React Web App (May 2024): Provides various text utilities like capitalization, word/character count, and reading time estimation.
-Wi-Fi Jammers (June 2024): Designed for exam security using ESP8266.
-Hostel Management Software (July 2024): Developed to track student attendance in the hostel.
-Pi 5 Offline Translator (September 2024): IoT device that translates into 10 different languages without internet access.
+Experience
+NFThing (Dec 2024 – Present)
+Full-Stack Developer Intern, Bengaluru
+• Contributed to a React-based movie rating web app.
+• Built an infinite carousel for top-rated movies by genre using React.js and TailwindCSS.
+• Developed a dynamic Contributors page fetching images from backend.
+• Collaborated with frontend team using Git and coordinated via pull requests.
 
-Certifications:
-Machine Learning (September 2021) from Sololearn.
-TailwindCSS (June 2024).
-Open-source LLMs (September 2024).
-Platforms:  Web Development, Android Development
-Front End:  React Native, JavaScript 
-Back End:  Integrated platforms, IE, Custom, WordPress, etc 
-UX and UI Designer 
-Platforms:  Adobe Photoshop, Gimp, Figma 
-UI:  Website Mock-ups, App Mock-ups, Infographics, Stylesheets, Logos 
-UX:  Wireframing, Workflow Diagrams, Technical Specifications  
-Employment History
-Professional Work Experience:
-IoT Developer at Ada Lovelace Software Pvt. Ltd. (August 2024 - Present).
-Focuses on creating IoT solutions for assisting disabled individuals.
-Worked on devices enhancing accessibility using Raspberry Pi and ESP8266. 
+Ada Lovelace Software Pvt. Ltd. (Aug 2024 – Aug 2025)
+Software Engineer Intern, Bengaluru
+• Developed a full-stack Gmail-integrated web app with Google OAuth & Gmail API.
+• Added text-to-speech for email reading to enhance accessibility.
+• Integrated Groq API for AI-assisted email summarization & reply generation.
+• Added multilingual support with Kannada translation feature.
+• Designed secure AI-assisted Compose feature; deployed responsive React.js/Tailwind UI on Render.
 
-Additional Skills and Interests
-Language: Fluent in English,Hindi,Kannada,Urdu
+Projects
+DeFakeIt: Deepfake Detection Web App
+• Built with React.js, TailwindCSS, TensorFlow.js, MobileNetV2.
+• Detects deepfakes & verifies liveness via real-time face analysis.
+• Features: webcam-based detection, image upload, AI-generated analysis with confidence scores.
+
+Pi 5 Offline Translator
+• IoT-based offline translator on Raspberry Pi 5 with TinyLlama LLM & Flask.
+• Supports 10 languages, speech-to-text, text-to-speech.
+• Responsive TailwindCSS web UI for real-time feedback.
+
+Hostel Management Software
+• MERN stack + Chart.js project to manage hostel students.
+• Features: USN-based search, update, deletion, automated mess fee refunds.
+• Visualized 7-day attendance trends to optimize mess planning.
+
+Technical Skills
+Languages: Python, Java, HTML/CSS, JavaScript, SQL
+Tools/Technologies: React.js, Node.js (MERN), Firebase, TailwindCSS, Postman, Git, Unix, VS Code, Linux, REST APIs, GitHub, DevOps, Jenkins, Docker, CI/CD, Eclipse, Google Cloud Platform
+Databases: MySQL, MongoDB, Oracle
+Soft Skills: Time Management, Writing, Public Speaking, Leadership, Logical Thinking & Problem-Solving
+
+Achievements / Certifications
+• Supervised Machine Learning: Regression and Classification
+• TailwindCSS from A to Z
+• Open-source LLMs: Secure AI with RAG
+• CET Rank: 99 (Karnataka)
+• Solved 150+ coding problems on LeetCode, GeeksforGeeks, Coding Ninjas
+
+Additional
+Languages: Fluent in English, Hindi, Kannada, Urdu
 Hobbies: Cricket, Web Design, Calligraphy
-Online: Youtube,Leetcode,Instagram`
+Online Presence: YouTube, LeetCode, Instagram
+`
+
 
