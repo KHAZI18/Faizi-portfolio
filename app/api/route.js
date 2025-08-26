@@ -32,8 +32,10 @@
 
 import { NextResponse } from 'next/server';
 
+// const apiKey = process.env.GROQ_API_KEY;
+// const model = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 const apiKey = process.env.GROQ_API_KEY;
-const model = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+const model  = process.env.GROQ_MODEL || 'llama-3.1-70b-versatile';
 
 export async function POST(req) {
   try {
@@ -65,14 +67,24 @@ export async function POST(req) {
       });
 
       // Call the REST endpoint directly
-      const res = await fetch(restUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-        },
-        body: JSON.stringify({ messages, model }),
-      });
+      // const res = await fetch(restUrl, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      //   },
+      //   body: JSON.stringify({ messages, model }),
+      // });
+
+		// ... inside REST fallback fetch():
+		const res = await fetch(process.env.GROQ_REST_URL || 'https://api.groq.com/openai/v1/chat/completions', {
+		  method: 'POST',
+		  headers: {
+		    'Content-Type': 'application/json',
+		    Authorization: `Bearer ${apiKey}`,
+		  },
+		  body: JSON.stringify({ messages, model }),
+		});
 
       if (!res.ok) {
         const text = await res.text().catch(() => '');
