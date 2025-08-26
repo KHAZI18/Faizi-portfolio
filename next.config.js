@@ -1,8 +1,6 @@
-// next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    output: 'export',  // This replaces `next export`
-  }
-  
-  module.exports = nextConfig;
-  
+  reactStrictMode: true,
+  // IMPORTANT: do NOT set `output: 'export'`
+};
+module.exports = nextConfig;
