@@ -29,7 +29,8 @@
 // 		message: response.choices[0].message.content
 // 	 })
 // }
-
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 
 // const apiKey = process.env.GROQ_API_KEY;
